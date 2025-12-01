@@ -1,0 +1,667 @@
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Users, Calendar, MessageSquare, ArrowLeft, Bell, Trash2, Send, MapPin, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
+
+export default function ClubDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [club, setClub] = useState<any>(null);
+  const [clubHead, setClubHead] = useState<string>("");
+  const [memberCount, setMemberCount] = useState(0);
+  const [members, setMembers] = useState<any[]>([]);
+  const [isMember, setIsMember] = useState(false);
+  const [events, setEvents] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [discussions, setDiscussions] = useState<any[]>([]);
+  const [newDiscussion, setNewDiscussion] = useState("");
+  const [registrations, setRegistrations] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (id) {
+      fetchClubData();
+    }
+    if (user) {
+      fetchUserRegistrations();
+    }
+  }, [id, user]);
+
+  const fetchClubData = async () => {
+    setLoading(true);
+
+    // Fetch club details
+    const { data: clubData } = await supabase
+      .from("clubs")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (clubData) {
+      setClub(clubData);
+    }
+
+    // Fetch club head name
+    const { data: headData } = await supabase
+      .from("club_members")
+      .select("user:profiles(name)")
+      .eq("club_id", id)
+      .eq("role_in_club", "head")
+      .maybeSingle();
+
+    if (headData && headData.user) {
+      setClubHead(headData.user.name);
+    }
+
+    // Fetch member count
+    const { count } = await supabase
+      .from("club_members")
+      .select("*", { count: "exact", head: true })
+      .eq("club_id", id);
+    setMemberCount(count || 0);
+
+    // Fetch member details manually to ensure data availability
+    const { data: membersData } = await supabase
+      .from("club_members")
+      .select("user_id")
+      .eq("club_id", id);
+
+    if (membersData && membersData.length > 0) {
+      const userIds = membersData.map((m) => m.user_id);
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("name, email")
+        .in("id", userIds);
+
+      if (profilesData) {
+        setMembers(profilesData);
+      }
+    } else {
+      setMembers([]);
+    }
+
+    // Check if user is a member
+    if (user) {
+      const { data: memberData } = await supabase
+        .from("club_members")
+        .select("*")
+        .eq("club_id", id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      setIsMember(!!memberData);
+    }
+
+    // Fetch club events
+    const { data: eventsData } = await supabase
+      .from("events")
+      .select("*")
+      .eq("organizer_club", id)
+      .gte("date", new Date().toISOString())
+      .order("date", { ascending: true });
+    setEvents(eventsData || []);
+
+    // Fetch announcements
+    const { data: announcementsData } = await supabase
+      .from("announcements")
+      .select("*")
+      .eq("club_id", id)
+      .order("timestamp", { ascending: false });
+    setAnnouncements(announcementsData || []);
+
+    // Fetch discussions
+    const { data: discussionsData } = await supabase
+      .from("club_discussions")
+      .select("*, user:profiles(name, email)")
+      .eq("club_id", id)
+      .order("created_at", { ascending: true });
+    setDiscussions(discussionsData || []);
+
+    setLoading(false);
+  };
+
+  const handlePostDiscussion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !newDiscussion.trim()) return;
+
+    const { error } = await supabase
+      .from("club_discussions")
+      .insert({
+        club_id: id,
+        user_id: user.id,
+        message: newDiscussion,
+      });
+
+    if (error) {
+      toast.error("Failed to post message");
+    } else {
+      toast.success("Message posted!");
+      setNewDiscussion("");
+      fetchClubData();
+    }
+  };
+
+  const handleDeleteDiscussion = async (discussionId: string) => {
+    const { error } = await supabase
+      .from("club_discussions")
+      .delete()
+      .eq("id", discussionId);
+
+    if (error) {
+      toast.error("Failed to delete message");
+    } else {
+      toast.success("Message deleted");
+      fetchClubData();
+    }
+  };
+
+  const fetchUserRegistrations = async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("event_participants")
+      .select("event_id")
+      .eq("user_id", user.id);
+
+    if (data) {
+      setRegistrations(new Set(data.map(r => r.event_id)));
+    }
+  };
+
+  const handleRegister = async (eventId: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("event_participants")
+      .insert({
+        event_id: eventId,
+        user_id: user.id,
+      });
+
+    if (error) {
+      toast.error("Failed to register for event");
+    } else {
+      toast.success("Successfully registered!");
+      fetchClubData(); // Refresh to update counts if needed
+      fetchUserRegistrations();
+    }
+  };
+
+  const handleUnregister = async (eventId: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("event_participants")
+      .delete()
+      .eq("event_id", eventId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast.error("Failed to unregister");
+    } else {
+      toast.success("Unregistered from event");
+      fetchClubData();
+      fetchUserRegistrations();
+    }
+  };
+
+  const handleJoinClub = async () => {
+    if (!user || !club) return;
+
+    const { error } = await supabase
+      .from("club_members")
+      .insert({
+        club_id: club.id,
+        user_id: user.id,
+        role_in_club: "member",
+      });
+
+    if (error) {
+      toast.error("Failed to join club");
+    } else {
+      toast.success("Successfully joined club!");
+      fetchClubData();
+    }
+  };
+
+  const handleLeaveClub = async () => {
+    if (!user || !club) return;
+
+    const { error } = await supabase
+      .from("club_members")
+      .delete()
+      .eq("club_id", club.id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast.error("Failed to leave club");
+    } else {
+      toast.success("Left the club");
+      fetchClubData();
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50/50 pb-12">
+
+        {/* Skeleton Header */}
+        <div className="w-full bg-slate-900 py-20">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center gap-8">
+              <Skeleton className="w-32 h-32 rounded-2xl bg-slate-800" />
+              <div className="space-y-4">
+                <Skeleton className="h-12 w-64 bg-slate-800" />
+                <Skeleton className="h-8 w-32 bg-slate-800" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="container mx-auto px-4 -mt-12">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6 mt-8 lg:mt-0">
+              <Skeleton className="h-[200px] w-full rounded-xl" />
+              <Skeleton className="h-[300px] w-full rounded-xl" />
+            </div>
+            <div className="space-y-6">
+              <Skeleton className="h-[100px] w-full rounded-xl" />
+              <Skeleton className="h-[200px] w-full rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!club) {
+    return (
+      <div className="min-h-screen bg-gray-50/50">
+
+        <div className="container mx-auto px-4 py-20 text-center">
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Club not found</h2>
+          <p className="text-slate-500">The club you are looking for does not exist or has been removed.</p>
+          <Button className="mt-6" onClick={() => navigate("/clubs")}>Back to Clubs</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50/50 pb-12">
+
+
+      {/* Header Section */}
+      <div className="w-full bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white py-20 relative overflow-hidden">
+        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="container mx-auto px-4 relative z-10">
+          <Button
+            variant="ghost"
+            className="text-white/70 hover:text-white hover:bg-white/10 mb-8 pl-0 gap-2"
+            onClick={() => navigate("/clubs")}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Clubs
+          </Button>
+
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
+            <div className="w-32 h-32 bg-white rounded-2xl flex items-center justify-center text-slate-900 shadow-xl shrink-0 overflow-hidden">
+              {club.logo_url ? (
+                <img src={club.logo_url} alt={club.name} className="w-full h-full object-cover" />
+              ) : (
+                <Users className="w-16 h-16 text-slate-300" />
+              )}
+            </div>
+            <div>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">{club.name}</h1>
+              <div className="flex items-center gap-3">
+                <Badge variant="secondary" className="bg-white/10 text-white hover:bg-white/20 border-none backdrop-blur-sm px-3 py-1 text-sm font-medium">
+                  {club.category}
+                </Badge>
+                <div className="flex items-center gap-2 text-slate-300 text-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  Active Community
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8 relative z-20">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="w-full justify-start mb-6 bg-white p-1.5 h-auto shadow-sm rounded-xl border border-slate-200/60">
+                <TabsTrigger value="overview" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-md transition-all">Overview</TabsTrigger>
+                <TabsTrigger value="events" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-md transition-all">Events</TabsTrigger>
+                <TabsTrigger value="announcements" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-md transition-all">Announcements</TabsTrigger>
+                <TabsTrigger value="discussions" className="px-6 py-2.5 rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-md transition-all">Discussions</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview" className="space-y-6 mt-0">
+                <Card className="border-slate-200/60 shadow-sm bg-white">
+                  <CardHeader>
+                    <CardTitle className="text-xl font-bold text-slate-900">About the Club</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-slate-600 leading-relaxed whitespace-pre-wrap text-lg">{club.description}</p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="events" className="mt-0">
+                <Card className="border-slate-200/60 shadow-sm bg-white">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-xl font-bold text-slate-900">
+                      <Calendar className="w-5 h-5 text-emerald-600" />
+                      Upcoming Events
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {events.length > 0 ? (
+                      events.map((event) => (
+                        <div key={event.id} className="p-5 rounded-xl bg-slate-50 border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-slate-200 transition-colors">
+                          <div>
+                            <h3 className="font-bold text-lg text-slate-900 mb-1">{event.title}</h3>
+                            <div className="flex flex-col gap-1">
+                              <p className="text-sm text-slate-500 flex items-center gap-2">
+                                <Calendar className="w-4 h-4" />
+                                {new Date(event.date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} at {new Date(event.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              <p className="text-sm text-slate-500 flex items-center gap-2">
+                                <MapPin className="w-4 h-4" />
+                                {event.venue}
+                              </p>
+                            </div>
+                          </div>
+                          {registrations.has(event.id) ? (
+                            <Button
+                              variant="outline"
+                              onClick={() => handleUnregister(event.id)}
+                              className="shrink-0 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            >
+                              Cancel Registration
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() => handleRegister(event.id)}
+                              className="shrink-0 bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/10"
+                            >
+                              Register Now
+                            </Button>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-12">
+                        <Calendar className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                        <p className="text-slate-500">No upcoming events scheduled.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="announcements" className="mt-0">
+                <Card className="border-slate-200/60 shadow-sm bg-white">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-xl font-bold text-slate-900">
+                      <Bell className="w-5 h-5 text-orange-500" />
+                      Announcements
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {announcements.length > 0 ? (
+                      announcements.map((announcement) => (
+                        <div key={announcement.id} className="p-5 rounded-xl bg-slate-50 border border-slate-100">
+                          <p className="text-slate-800 mb-3 leading-relaxed">{announcement.message}</p>
+                          <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                            <span className="px-2 py-1 rounded-md bg-white border border-slate-100">
+                              {new Date(announcement.timestamp).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-12">
+                        <Bell className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                        <p className="text-slate-500">No announcements yet.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="discussions" className="mt-0">
+                <Card className="border-slate-200/60 shadow-sm bg-white">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-xl font-bold text-slate-900">
+                      <MessageSquare className="w-5 h-5 text-blue-600" />
+                      Discussion Board
+                    </CardTitle>
+                    <CardDescription>Connect and chat with other club members</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <ScrollArea className="h-[300px] pr-4 -mr-4">
+                      <div className="space-y-6 pr-4">
+                        {discussions.length > 0 ? (
+                          discussions.map((discussion) => (
+                            <div key={discussion.id} className={`flex gap-4 ${discussion.user_id === user?.id ? "flex-row-reverse" : ""}`}>
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 shadow-sm ${discussion.user_id === user?.id ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}>
+                                {discussion.user?.name?.charAt(0) || "?"}
+                              </div>
+                              <div className={`flex flex-col max-w-[80%] ${discussion.user_id === user?.id ? "items-end" : "items-start"}`}>
+                                <div className={`p-4 rounded-2xl shadow-sm ${discussion.user_id === user?.id ? "bg-blue-600 text-white rounded-tr-none" : "bg-slate-100 text-slate-800 rounded-tl-none"}`}>
+                                  <p className="text-sm leading-relaxed">{discussion.message}</p>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1.5 px-1">
+                                  <span className="text-xs text-slate-400 font-medium">
+                                    {discussion.user?.name} • {new Date(discussion.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                  {(user?.id === discussion.user_id || clubHead === user?.user_metadata?.name) && (
+                                    <button
+                                      onClick={() => handleDeleteDiscussion(discussion.id)}
+                                      className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                                      title="Delete message"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-20 text-slate-400">
+                            <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                            <p className="text-lg font-medium">No messages yet</p>
+                            <p className="text-sm">Be the first to start the conversation!</p>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+
+                    {isMember ? (
+                      <form onSubmit={handlePostDiscussion} className="flex gap-3 pt-4 border-t border-slate-100">
+                        <Input
+                          placeholder="Type your message..."
+                          value={newDiscussion}
+                          onChange={(e) => setNewDiscussion(e.target.value)}
+                          className="flex-1 bg-slate-50 border-slate-200 focus-visible:ring-slate-900"
+                        />
+                        <Button type="submit" size="icon" disabled={!newDiscussion.trim()} className="bg-slate-900 hover:bg-slate-800 text-white shrink-0 w-10 h-10 rounded-lg">
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </form>
+                    ) : (
+                      <div className="text-center p-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-sm text-slate-500">
+                        Join the club to participate in discussions.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Join/Leave Action Card */}
+            <Card className="border-slate-200/60 shadow-sm bg-white overflow-hidden">
+              <CardContent className="pt-6">
+                {isMember ? (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="w-full h-12 text-base font-medium shadow-lg shadow-red-500/20">
+                        Leave Club
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          You are about to leave {club.name}. You will lose access to member-only events and announcements.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleLeaveClub} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Leave Club
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                ) : (
+                  <Button
+                    className="w-full h-12 text-base font-medium bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20"
+                    onClick={handleJoinClub}
+                  >
+                    <Users className="w-5 h-5 mr-2" />
+                    Join Club
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Club Info Card */}
+            <Card className="border-slate-200/60 shadow-sm bg-white">
+              <CardHeader className="pb-4 border-b border-slate-100">
+                <CardTitle className="text-lg font-bold text-slate-900">Club Info</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6 pt-6">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <div className="flex items-center gap-4 cursor-pointer hover:bg-slate-50 p-3 -mx-3 rounded-xl transition-colors group">
+                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500 font-medium">Members</p>
+                        <p className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{memberCount}</p>
+                      </div>
+                    </div>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Club Members</DialogTitle>
+                    </DialogHeader>
+                    <ScrollArea className="h-[300px] pr-4">
+                      <div className="space-y-4">
+                        {members.length > 0 ? (
+                          members.map((member, index) => (
+                            <div key={index} className="flex items-center gap-3 pb-3 border-b last:border-0">
+                              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm">
+                                {member.name.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-900">{member.name}</p>
+                                <p className="text-xs text-slate-500">{member.email}</p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-center text-slate-500 py-4">No members found.</p>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </DialogContent>
+                </Dialog>
+
+                <div className="flex items-center gap-4 p-3 -mx-3">
+                  <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500 font-medium">Faculty Advisor</p>
+                    <p className="font-semibold text-slate-900">{club.faculty_advisor || "Not Assigned"}</p>
+                  </div>
+                </div>
+
+                {clubHead && (
+                  <div className="flex items-center gap-4 p-3 -mx-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500 font-medium">Club Head</p>
+                      <p className="font-semibold text-slate-900">{clubHead}</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* WhatsApp Contact Card */}
+            <Card className="border-slate-200/60 shadow-sm bg-white overflow-hidden">
+              <CardContent className="pt-6">
+                <Button
+                  className="w-full h-12 bg-[#25D366] hover:bg-[#128C7E] text-white gap-2 font-medium shadow-lg shadow-[#25D366]/20"
+                  onClick={() => {
+                    if (club.whatsapp_link) {
+                      window.open(club.whatsapp_link, "_blank");
+                    } else {
+                      toast.error("No WhatsApp link available for this club");
+                    }
+                  }}
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  Join WhatsApp Group
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
