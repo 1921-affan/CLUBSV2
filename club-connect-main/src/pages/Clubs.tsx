@@ -52,15 +52,29 @@ export default function Clubs() {
   }, [user]);
 
   const fetchClubs = async () => {
-    const { data } = await supabase
+    const { data: clubsData } = await supabase
       .from("clubs")
       .select("*")
       .order("name");
 
-    if (data) {
-      setClubs(data);
+    if (clubsData) {
+      // Fetch club heads
+      const { data: headsData } = await supabase
+        .from("club_members")
+        .select("club_id, user:profiles(name)")
+        .eq("role_in_club", "head");
+
+      const clubsWithHeads = clubsData.map(club => {
+        const head = headsData?.find(h => h.club_id === club.id);
+        return {
+          ...club,
+          club_head: head?.user?.name || null
+        };
+      });
+
+      setClubs(clubsWithHeads);
       // Extract unique categories
-      const uniqueCategories = [...new Set(data.map(club => club.category))];
+      const uniqueCategories = [...new Set(clubsData.map(club => club.category))];
       setCategories(uniqueCategories);
     }
   };
@@ -322,14 +336,28 @@ export default function Clubs() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="mt-auto pt-0 px-5 pb-5">
-                    {club.faculty_advisor && (
-                      <div className="pt-3 border-t border-slate-100">
-                        <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-0.5">
-                          Faculty Advisor
-                        </p>
-                        <p className="text-xs text-slate-600 truncate">
-                          {club.faculty_advisor}
-                        </p>
+                    {(club.faculty_advisor || club.club_head) && (
+                      <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-4">
+                        {club.faculty_advisor && (
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-0.5">
+                              Faculty Advisor
+                            </p>
+                            <p className="text-xs text-slate-600 truncate">
+                              {club.faculty_advisor}
+                            </p>
+                          </div>
+                        )}
+                        {club.club_head && (
+                          <div className={club.faculty_advisor ? "text-right" : ""}>
+                            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-0.5">
+                              Club Head
+                            </p>
+                            <p className="text-xs text-slate-600 truncate">
+                              {club.club_head}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="mt-3 flex items-center text-xs text-slate-400 group-hover:text-blue-500 transition-colors font-medium">

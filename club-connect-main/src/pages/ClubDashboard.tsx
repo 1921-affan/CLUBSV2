@@ -82,25 +82,49 @@ export default function ClubDashboard() {
   const fetchClubsWhereHead = async () => {
     if (!user) return;
 
-    const { data } = await supabase
+    // First fetch the club IDs where the user is a head
+    const { data: memberData, error: memberError } = await supabase
       .from("club_members")
-      .select("club_id, clubs(*)")
+      .select("club_id")
       .eq("user_id", user.id)
       .eq("role_in_club", "head");
 
-    if (data && data.length > 0) {
-      const clubsList = data.map((item) => item.clubs).filter(Boolean);
-      setClubs(clubsList);
-      if (clubsList.length > 0) {
-        setSelectedClub(clubsList[0]);
-        setClubForm({
-          name: clubsList[0].name || "",
-          category: clubsList[0].category || "",
-          description: clubsList[0].description || "",
-          faculty_advisor: clubsList[0].faculty_advisor || "",
-          whatsapp_link: clubsList[0].whatsapp_link || "",
-        });
+    if (memberError) {
+      console.error("Error fetching club memberships:", memberError);
+      setLoading(false);
+      return;
+    }
+
+    if (memberData && memberData.length > 0) {
+      const clubIds = memberData.map((item) => item.club_id);
+
+      // Then fetch the actual club details
+      const { data: clubsData, error: clubsError } = await supabase
+        .from("clubs")
+        .select("*")
+        .in("id", clubIds);
+
+      if (clubsError) {
+        console.error("Error fetching clubs:", clubsError);
+        toast.error("Failed to load clubs");
+      } else if (clubsData) {
+        setClubs(clubsData);
+
+        // Only set selected club if none is currently selected or if the current selection is not in the new list
+        // But for simplicity on load, we usually select the first one if nothing is selected
+        if (clubsData.length > 0 && !selectedClub) {
+          setSelectedClub(clubsData[0]);
+          setClubForm({
+            name: clubsData[0].name || "",
+            category: clubsData[0].category || "",
+            description: clubsData[0].description || "",
+            faculty_advisor: clubsData[0].faculty_advisor || "",
+            whatsapp_link: clubsData[0].whatsapp_link || "",
+          });
+        }
       }
+    } else {
+      setClubs([]);
     }
     setLoading(false);
   };

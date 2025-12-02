@@ -40,6 +40,7 @@ export default function ClubDetail() {
   const [memberCount, setMemberCount] = useState(0);
   const [members, setMembers] = useState<any[]>([]);
   const [isMember, setIsMember] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [events, setEvents] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [discussions, setDiscussions] = useState<any[]>([]);
@@ -71,15 +72,25 @@ export default function ClubDetail() {
     }
 
     // Fetch club head name
-    const { data: headData } = await supabase
+    const { data: headMembers } = await supabase
       .from("club_members")
-      .select("user:profiles(name)")
+      .select("user_id")
       .eq("club_id", id)
       .eq("role_in_club", "head")
-      .maybeSingle();
+      .limit(1);
 
-    if (headData && headData.user) {
-      setClubHead(headData.user.name);
+    const headMember = headMembers?.[0];
+
+    if (headMember) {
+      const { data: headProfile } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("id", headMember.user_id)
+        .single();
+
+      if (headProfile) {
+        setClubHead(headProfile.name);
+      }
     }
 
     // Fetch member count
@@ -118,6 +129,11 @@ export default function ClubDetail() {
         .eq("user_id", user.id)
         .maybeSingle();
       setIsMember(!!memberData);
+      if (memberData) {
+        setCurrentUserRole(memberData.role_in_club);
+      } else {
+        setCurrentUserRole("");
+      }
     }
 
     // Fetch club events
@@ -265,6 +281,23 @@ export default function ClubDetail() {
       toast.error("Failed to leave club");
     } else {
       toast.success("Left the club");
+      fetchClubData();
+    }
+  };
+
+  const handleRestoreHeadAccess = async () => {
+    if (!user || !club) return;
+
+    const { error } = await supabase
+      .from("club_members")
+      .update({ role_in_club: "head" })
+      .eq("club_id", club.id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast.error("Failed to restore head access");
+    } else {
+      toast.success("Head access restored! You can now manage this club.");
       fetchClubData();
     }
   };
@@ -538,29 +571,40 @@ export default function ClubDetail() {
           <div className="space-y-6">
             {/* Join/Leave Action Card */}
             <Card className="border-slate-200/60 shadow-sm bg-white overflow-hidden">
-              <CardContent className="pt-6">
+              <CardContent className="pt-6 space-y-3">
                 {isMember ? (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" className="w-full h-12 text-base font-medium shadow-lg shadow-red-500/20">
-                        Leave Club
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          You are about to leave {club.name}. You will lose access to member-only events and announcements.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleLeaveClub} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  <>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" className="w-full h-12 text-base font-medium shadow-lg shadow-red-500/20">
                           Leave Club
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            You are about to leave {club.name}. You will lose access to member-only events and announcements.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleLeaveClub} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            Leave Club
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+
+                    {user && club.created_by === user.id && currentUserRole !== "head" && (
+                      <Button
+                        onClick={handleRestoreHeadAccess}
+                        className="w-full h-12 text-base font-medium bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20"
+                      >
+                        Restore Head Access
+                      </Button>
+                    )}
+                  </>
                 ) : (
                   <Button
                     className="w-full h-12 text-base font-medium bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20"
