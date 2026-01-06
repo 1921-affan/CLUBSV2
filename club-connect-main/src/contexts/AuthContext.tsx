@@ -1,135 +1,114 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
+
+// Define User Type (Custom, not Supabase)
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: "student" | "club_head" | "admin";
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
-  signOut: () => Promise<void>;
+  signUp: (email: string, password: string, name: string, role?: string) => Promise<{ error: any }>;
+  signOut: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Initialize Axios and Check for Token
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    const token = localStorage.getItem("token");
+    if (token) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      checkUserSession();
+    } else {
       setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    }
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    if (!error && data.user) {
-      // Check user role and redirect accordingly
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", data.user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      
-      if (roleData) {
-        // User is admin, redirect to admin panel
-        setTimeout(() => navigate("/admin"), 100);
-      } else {
-        // Check if user is a club head
-        const { data: clubHeadData } = await supabase
-          .from("club_members")
-          .select("id")
-          .eq("user_id", data.user.id)
-          .eq("role_in_club", "head")
-          .limit(1)
-          .maybeSingle();
-        
-        if (clubHeadData) {
-          // User is a club head, redirect to dashboard
-          setTimeout(() => navigate("/dashboard"), 100);
-        } else {
-          // Regular user, redirect to home
-          setTimeout(() => navigate("/"), 100);
-        }
-      }
-    }
-    
-    return { error };
-  };
-
-  const signUp = async (email: string, password: string, name: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          name: name,
-        },
-      },
-    });
-
-    if (!error) {
-      // Send welcome email
-      setTimeout(async () => {
-        try {
-          await supabase.functions.invoke("send-welcome-email", {
-            body: {
-              to: email,
-              name: name,
-            },
-          });
-        } catch (emailError) {
-          console.error("Failed to send welcome email:", emailError);
-        }
-      }, 1000);
-    }
-
-    return { error };
-  };
-
-  const signOut = async () => {
+  const checkUserSession = async () => {
     try {
-      await supabase.auth.signOut();
+      const response = await axios.get("http://localhost:5000/api/auth/me");
+      setUser(response.data.user);
     } catch (error) {
-      // Even if server-side logout fails, clear local state
-      console.log("Logout error (will clear local state anyway):", error);
-    } finally {
-      // Always clear local state and navigate
-      setSession(null);
+      console.error("Session verification failed", error);
+      localStorage.removeItem("token");
+      delete axios.defaults.headers.common["Authorization"];
       setUser(null);
-      navigate("/login");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const response = await axios.post("http://localhost:5000/api/auth/login", { email, password });
+
+      const { token, user } = response.data;
+
+      // Save Token
+      localStorage.setItem("token", token);
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+      setUser(user);
+
+      // Redirect Logic
+      if (user.role === 'admin') {
+        setTimeout(() => navigate("/admin"), 100);
+      } else if (user.role === 'club_head') {
+        setTimeout(() => navigate("/dashboard"), 100);
+      } else {
+        setTimeout(() => navigate("/"), 100);
+      }
+
+      return { error: null };
+    } catch (error: any) {
+      return { error: error.response?.data || { message: "Login failed" } };
+    }
+  };
+
+  const signUp = async (email: string, password: string, name: string, role: string = 'student') => {
+    try {
+      // Default to 'student' if not specified. 
+      // Note: Admin/Club Head creation rules are enforced by backend policies (Single Admin, etc.)
+      const response = await axios.post("http://localhost:5000/api/auth/register", {
+        email,
+        password,
+        name,
+        role
+      });
+
+      // Auto-login after register? Or ask to login?
+      // Let's ask to login for simplicity, or we could handle token return if backend supports it.
+      // Current backend register returns userId but no token.
+
+      // For now, return success
+      return { error: null };
+
+    } catch (error: any) {
+      return { error: error.response?.data || { message: "Registration failed" } };
+    }
+  };
+
+  const signOut = () => {
+    localStorage.removeItem("token");
+    delete axios.defaults.headers.common["Authorization"];
+    setUser(null);
+    navigate("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

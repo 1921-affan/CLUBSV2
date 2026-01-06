@@ -4,56 +4,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { LogOut, Menu, X, LayoutDashboard, ShieldCheck, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
-
 export function Navbar() {
   const { signOut, user } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isClubHead, setIsClubHead] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [userName, setUserName] = useState("");
 
-
-  useEffect(() => {
-    if (user) {
-      checkUserRoles();
-    }
-  }, [user]);
-
-  const checkUserRoles = async () => {
-    if (!user) return;
-
-    // Get user name
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("name")
-      .eq("id", user.id)
-      .single();
-
-    if (profileData) {
-      setUserName(profileData.name);
-    }
-
-    // Check if club head
-    const { data: clubData } = await supabase
-      .from("club_members")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("role_in_club", "head");
-
-    setIsClubHead(clubData && clubData.length > 0);
-
-    // Check if admin
-    const { data: roleData } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
-      .maybeSingle();
-
-    setIsAdmin(!!roleData);
-  };
+  // Derived state from user object
+  const userName = user?.name || "User";
+  const isAdmin = user?.role === 'admin';
+  const isClubHead = user?.role === 'club_head';
 
   const navLinks = [
     { to: "/", label: "Home" },

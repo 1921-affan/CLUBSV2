@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,66 +23,58 @@ export default function Events() {
   }, [user]);
 
   const fetchEvents = async () => {
-    const { data } = await supabase
-      .from("events")
-      .select(`
-        *,
-        organizer_club:clubs(name),
-        event_participants(count)
-      `)
-      .gte("date", new Date().toISOString())
-      .order("date", { ascending: true });
-
-    setEvents(data || []);
+    try {
+      const response = await axios.get('http://localhost:5000/api/events');
+      setEvents(response.data);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      toast.error("Failed to load events");
+    }
   };
 
   const fetchUserRegistrations = async () => {
     if (!user) return;
 
-    const { data } = await supabase
-      .from("event_participants")
-      .select("event_id")
-      .eq("user_id", user.id);
-
-    if (data) {
-      setRegistrations(new Set(data.map(r => r.event_id)));
+    try {
+      const response = await axios.get('http://localhost:5000/api/users/me/registrations', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      // Backend returns array of { event_id: ... } objects
+      setRegistrations(new Set(response.data.map((r: any) => r.event_id)));
+    } catch (error) {
+      console.error("Error fetching registrations:", error);
     }
   };
 
   const handleRegister = async (eventId: string) => {
     if (!user) return;
 
-    const { error } = await supabase
-      .from("event_participants")
-      .insert({
-        event_id: eventId,
-        user_id: user.id,
+    try {
+      await axios.post(`http://localhost:5000/api/events/${eventId}/register`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-
-    if (error) {
-      toast.error("Failed to register for event");
-    } else {
       toast.success("Successfully registered!");
       fetchEvents();
       fetchUserRegistrations();
+    } catch (error: any) {
+      console.error("Error registering:", error);
+      toast.error(error.response?.data?.message || "Failed to register for event");
     }
   };
 
   const handleUnregister = async (eventId: string) => {
     if (!user) return;
 
-    const { error } = await supabase
-      .from("event_participants")
-      .delete()
-      .eq("event_id", eventId)
-      .eq("user_id", user.id);
-
-    if (error) {
-      toast.error("Failed to unregister");
-    } else {
+    try {
+      await axios.delete(`http://localhost:5000/api/events/${eventId}/register`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
       toast.success("Unregistered from event");
       fetchEvents();
       fetchUserRegistrations();
+    } catch (error: any) {
+      console.error("Error unregistering:", error);
+      toast.error(error.response?.data?.message || "Failed to unregister");
     }
   };
 

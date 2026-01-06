@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,39 +17,20 @@ export default function Home() {
   });
 
   useEffect(() => {
-    fetchFeaturedClubs();
-    fetchUpcomingEvents();
-    fetchStats();
+    fetchHomeData();
   }, []);
 
-  const fetchStats = async () => {
-    const { count: clubsCount } = await supabase.from("clubs").select("*", { count: "exact", head: true });
-    const { count: eventsCount } = await supabase.from("events").select("*", { count: "exact", head: true });
-    const { count: membersCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+  const fetchHomeData = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/home');
+      const { featuredClubs, upcomingEvents, stats } = response.data;
 
-    setStats({
-      clubs: clubsCount || 0,
-      events: eventsCount || 0,
-      members: membersCount || 0,
-    });
-  };
-
-  const fetchFeaturedClubs = async () => {
-    const { data } = await supabase
-      .from("clubs")
-      .select("*")
-      .limit(3);
-    setFeaturedClubs(data || []);
-  };
-
-  const fetchUpcomingEvents = async () => {
-    const { data } = await supabase
-      .from("events")
-      .select("*, organizer_club:clubs(name)")
-      .gte("date", new Date().toISOString())
-      .order("date", { ascending: true })
-      .limit(3);
-    setUpcomingEvents(data || []);
+      setFeaturedClubs(featuredClubs);
+      setUpcomingEvents(upcomingEvents);
+      setStats(stats);
+    } catch (error) {
+      console.error("Failed to fetch home data", error);
+    }
   };
 
   return (

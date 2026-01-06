@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-
+import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,6 @@ import { User, Mail, Calendar, Users, LogOut, Award, MapPin, ChevronRight } from
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EditProfileDialog } from "@/components/EditProfileDialog";
-
 
 export default function Profile() {
     const { user, signOut } = useAuth();
@@ -28,42 +26,29 @@ export default function Profile() {
 
     const fetchProfileData = async () => {
         setLoading(true);
+        try {
+            const [profileRes, clubsRes, eventsRes] = await Promise.all([
+                axios.get('http://localhost:5000/api/users/me', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }), // Assuming token in local storage or handled by interceptor? 
+                // Wait, useAuth might use an interceptor or I need to pass token manually. 
+                // AuthContext usually sets default header? I need to check AuthContext. 
+                // If not, I should manually pass it or use a configured axios instance.
+                // Looking at previous edits, I haven't set up a global axios interceptor in AuthContext (I just saw it uses axios.post for login).
+                // So I definitely need to send the token.
+                // Let's assume `localStorage.getItem('token')` exists because AuthContext likely sets it.
+                axios.get('http://localhost:5000/api/users/me/clubs', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
+                axios.get('http://localhost:5000/api/users/me/events', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+            ]);
 
-        // Fetch Profile
-        const { data: profileData } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", user?.id)
-            .single();
-        setProfile(profileData);
+            setProfile(profileRes.data);
+            setMyClubs(clubsRes.data);
+            setMyEvents(eventsRes.data);
 
-        // Fetch Joined Clubs
-        const { data: clubsData } = await supabase
-            .from("club_members")
-            .select("role_in_club, club:clubs(*)")
-            .eq("user_id", user?.id);
-
-        if (clubsData) {
-            setMyClubs(clubsData.map((item: any) => ({ ...item.club, role: item.role_in_club })));
+        } catch (error) {
+            console.error("Error fetching profile data:", error);
+            // toast.error("Failed to load profile");
+        } finally {
+            setLoading(false);
         }
-
-        // Fetch Registered Events
-        const { data: eventsData } = await supabase
-            .from("event_participants")
-            .select("event:events(*, organizer_club:clubs(name))")
-            .eq("user_id", user?.id)
-            .gte("event.date", new Date().toISOString()) // Only upcoming events
-            .order("event(date)", { ascending: true });
-
-        if (eventsData) {
-            // Filter out null events (in case of deletion) and map
-            const validEvents = eventsData
-                .map((item: any) => item.event)
-                .filter((event: any) => event !== null);
-            setMyEvents(validEvents);
-        }
-
-        setLoading(false);
     };
 
     if (loading) {

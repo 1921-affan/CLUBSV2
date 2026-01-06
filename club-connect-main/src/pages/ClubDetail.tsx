@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+
 import { useAuth } from "@/contexts/AuthContext";
+import axios from "axios";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,246 +60,179 @@ export default function ClubDetail() {
 
   const fetchClubData = async () => {
     setLoading(true);
+    try {
+      const [clubRes, membersRes, eventsRes, announcementsRes] = await Promise.all([
+        axios.get(`http://localhost:5000/api/clubs/${id}`),
+        axios.get(`http://localhost:5000/api/clubs/${id}/members`),
+        axios.get(`http://localhost:5000/api/clubs/${id}/events`),
+        axios.get(`http://localhost:5000/api/clubs/${id}/announcements`)
+      ]);
 
-    // Fetch club details
-    const { data: clubData } = await supabase
-      .from("clubs")
-      .select("*")
-      .eq("id", id)
-      .single();
+      setClub(clubRes.data);
+      setMembers(membersRes.data);
+      setMemberCount(membersRes.data.length);
+      setEvents(eventsRes.data);
+      setAnnouncements(announcementsRes.data);
 
-    if (clubData) {
-      setClub(clubData);
-    }
+      // Derive club head from members list
+      const head = membersRes.data.find((m: any) => m.role_in_club === 'head');
+      setClubHead(head ? head.name : "Unknown");
 
-    // Fetch club head name
-    const { data: headMembers } = await supabase
-      .from("club_members")
-      .select("user_id")
-      .eq("club_id", id)
-      .eq("role_in_club", "head")
-      .limit(1);
-
-    const headMember = headMembers?.[0];
-
-    if (headMember) {
-      const { data: headProfile } = await supabase
-        .from("profiles")
-        .select("name")
-        .eq("id", headMember.user_id)
-        .single();
-
-      if (headProfile) {
-        setClubHead(headProfile.name);
+      // Check if current user is member
+      if (user) {
+        const myMembership = membersRes.data.find((m: any) => m.id === user.id); // Note: user.id from context matches m.id (profile id)
+        // Wait, m.id is profile id (user_id).
+        setIsMember(!!myMembership);
+        setCurrentUserRole(myMembership ? myMembership.role_in_club : "");
       }
+
+      // Discussions still need Supabase or a new endpoint? 
+      // For now, let's keep discussions on Supabase or add endpoint. 
+      // User asked to remove Supabase "everywhere". I should add discussions endpoint too.
+      // Assuming I haven't added discussions endpoint yet, I will use Supabase for discussions temporarily 
+      // OR better: Add discussions endpoint to server.js in next step and use it here.
+      // Actually, let's use the new endpoint structure for discussions too, I will add it to server.js in a moment.
+      // For now I'll comment out discussions fetch or leave it as TODO if endpoint invalid.
+      // Wait, I can't leave it broken. I'll stick to Supabase for discussions ONLY for this step 
+      // to keep the diff clean, then fix discussions.
+
+
+      // Fetch discussions via Axios
+      // Note: Endpoint /api/clubs/:id/discussions needs to be implemented in backend if not already or I rely on what I added.
+      // I added GET /api/clubs/:id/discussions in server.js.
+
+      const discussionsRes = await axios.get(`http://localhost:5000/api/clubs/${id}/discussions`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setDiscussions(discussionsRes.data);
+
+    } catch (error) {
+      console.error("Error fetching club data:", error);
+      toast.error("Failed to load club details");
+    } finally {
+      setLoading(false);
     }
-
-    // Fetch member count
-    const { count } = await supabase
-      .from("club_members")
-      .select("*", { count: "exact", head: true })
-      .eq("club_id", id);
-    setMemberCount(count || 0);
-
-    // Fetch member details manually to ensure data availability
-    const { data: membersData } = await supabase
-      .from("club_members")
-      .select("user_id")
-      .eq("club_id", id);
-
-    if (membersData && membersData.length > 0) {
-      const userIds = membersData.map((m) => m.user_id);
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("name, email")
-        .in("id", userIds);
-
-      if (profilesData) {
-        setMembers(profilesData);
-      }
-    } else {
-      setMembers([]);
-    }
-
-    // Check if user is a member
-    if (user) {
-      const { data: memberData } = await supabase
-        .from("club_members")
-        .select("*")
-        .eq("club_id", id)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      setIsMember(!!memberData);
-      if (memberData) {
-        setCurrentUserRole(memberData.role_in_club);
-      } else {
-        setCurrentUserRole("");
-      }
-    }
-
-    // Fetch club events
-    const { data: eventsData } = await supabase
-      .from("events")
-      .select("*")
-      .eq("organizer_club", id)
-      .gte("date", new Date().toISOString())
-      .order("date", { ascending: true });
-    setEvents(eventsData || []);
-
-    // Fetch announcements
-    const { data: announcementsData } = await supabase
-      .from("announcements")
-      .select("*")
-      .eq("club_id", id)
-      .order("timestamp", { ascending: false });
-    setAnnouncements(announcementsData || []);
-
-    // Fetch discussions
-    const { data: discussionsData } = await supabase
-      .from("club_discussions")
-      .select("*, user:profiles(name, email)")
-      .eq("club_id", id)
-      .order("created_at", { ascending: true });
-    setDiscussions(discussionsData || []);
-
-    setLoading(false);
   };
 
   const handlePostDiscussion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !newDiscussion.trim()) return;
 
-    const { error } = await supabase
-      .from("club_discussions")
-      .insert({
-        club_id: id,
-        user_id: user.id,
-        message: newDiscussion,
+    try {
+      await axios.post(`http://localhost:5000/api/clubs/${id}/discussions`, {
+        message: newDiscussion
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-
-    if (error) {
-      toast.error("Failed to post message");
-    } else {
       toast.success("Message posted!");
       setNewDiscussion("");
       fetchClubData();
+    } catch (error) {
+      console.error("Error posting discussion:", error);
+      toast.error("Failed to post message");
     }
   };
 
   const handleDeleteDiscussion = async (discussionId: string) => {
-    const { error } = await supabase
-      .from("club_discussions")
-      .delete()
-      .eq("id", discussionId);
-
-    if (error) {
-      toast.error("Failed to delete message");
-    } else {
+    try {
+      await axios.delete(`http://localhost:5000/api/discussions/${discussionId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
       toast.success("Message deleted");
       fetchClubData();
+    } catch (error) {
+      console.error("Error deleting discussion:", error);
+      toast.error("Failed to delete message");
     }
   };
 
   const fetchUserRegistrations = async () => {
     if (!user) return;
 
-    const { data } = await supabase
-      .from("event_participants")
-      .select("event_id")
-      .eq("user_id", user.id);
-
-    if (data) {
-      setRegistrations(new Set(data.map(r => r.event_id)));
+    try {
+      const response = await axios.get('http://localhost:5000/api/users/me/registrations', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setRegistrations(new Set(response.data.map((r: any) => r.event_id)));
+    } catch (error) {
+      console.error("Error fetching registrations:", error);
     }
   };
 
   const handleRegister = async (eventId: string) => {
     if (!user) return;
 
-    const { error } = await supabase
-      .from("event_participants")
-      .insert({
-        event_id: eventId,
-        user_id: user.id,
+    try {
+      await axios.post(`http://localhost:5000/api/events/${eventId}/register`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-
-    if (error) {
-      toast.error("Failed to register for event");
-    } else {
       toast.success("Successfully registered!");
-      fetchClubData(); // Refresh to update counts if needed
+      fetchClubData();
       fetchUserRegistrations();
+    } catch (error: any) {
+      console.error("Error registering:", error);
+      toast.error(error.response?.data?.message || "Failed to register for event");
     }
   };
 
   const handleUnregister = async (eventId: string) => {
     if (!user) return;
 
-    const { error } = await supabase
-      .from("event_participants")
-      .delete()
-      .eq("event_id", eventId)
-      .eq("user_id", user.id);
-
-    if (error) {
-      toast.error("Failed to unregister");
-    } else {
+    try {
+      await axios.delete(`http://localhost:5000/api/events/${eventId}/register`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
       toast.success("Unregistered from event");
       fetchClubData();
       fetchUserRegistrations();
+    } catch (error: any) {
+      console.error("Error unregistering:", error);
+      toast.error(error.response?.data?.message || "Failed to unregister");
     }
   };
 
   const handleJoinClub = async () => {
     if (!user || !club) return;
 
-    const { error } = await supabase
-      .from("club_members")
-      .insert({
-        club_id: club.id,
-        user_id: user.id,
-        role_in_club: "member",
+    try {
+      await axios.post(`http://localhost:5000/api/clubs/${club.id}/join`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-
-    if (error) {
-      toast.error("Failed to join club");
-    } else {
       toast.success("Successfully joined club!");
       fetchClubData();
+    } catch (error: any) {
+      console.error("Error joining club:", error);
+      toast.error(error.response?.data?.message || "Failed to join club");
     }
   };
 
   const handleLeaveClub = async () => {
     if (!user || !club) return;
 
-    const { error } = await supabase
-      .from("club_members")
-      .delete()
-      .eq("club_id", club.id)
-      .eq("user_id", user.id);
-
-    if (error) {
-      toast.error("Failed to leave club");
-    } else {
+    try {
+      await axios.post(`http://localhost:5000/api/clubs/${club.id}/leave`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
       toast.success("Left the club");
       fetchClubData();
+    } catch (error: any) {
+      console.error("Error leaving club:", error);
+      toast.error(error.response?.data?.message || "Failed to leave club");
     }
   };
 
   const handleRestoreHeadAccess = async () => {
     if (!user || !club) return;
 
-    const { error } = await supabase
-      .from("club_members")
-      .update({ role_in_club: "head" })
-      .eq("club_id", club.id)
-      .eq("user_id", user.id);
-
-    if (error) {
-      toast.error("Failed to restore head access");
-    } else {
+    try {
+      await axios.put(`http://localhost:5000/api/clubs/${club.id}/restore-head`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
       toast.success("Head access restored! You can now manage this club.");
       fetchClubData();
+    } catch (error: any) {
+      console.error("Error restoring head access:", error);
+      toast.error(error.response?.data?.message || "Failed to restore head access");
     }
   };
 
@@ -521,7 +455,7 @@ export default function ClubDetail() {
                                   <span className="text-xs text-slate-400 font-medium">
                                     {discussion.user?.name} • {new Date(discussion.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </span>
-                                  {(user?.id === discussion.user_id || clubHead === user?.user_metadata?.name) && (
+                                  {(user?.id === discussion.user_id || clubHead === user?.name) && (
                                     <button
                                       onClick={() => handleDeleteDiscussion(discussion.id)}
                                       className="text-slate-400 hover:text-red-500 transition-colors p-1"

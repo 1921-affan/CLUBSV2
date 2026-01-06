@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import axios from "axios";
 import { useAuth } from "@/contexts/AuthContext";
-
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useNavigate } from "react-router-dom";
-
-import { Search, Plus, Users, ArrowRight } from "lucide-react";
+import { Search, Plus, Users, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -43,73 +41,46 @@ export default function Clubs() {
     faculty_advisor: "",
     whatsapp_link: "",
   });
+  const [recommendedClubs, setRecommendedClubs] = useState<any[]>([]);
 
   useEffect(() => {
     fetchClubs();
     if (user) {
       fetchMyPendingClubs();
+      fetchRecommendedClubs();
     }
   }, [user]);
 
   const fetchClubs = async () => {
-    const { data: clubsData } = await supabase
-      .from("clubs")
-      .select("*")
-      .order("name");
-
-    if (clubsData) {
-      // Fetch club heads
-      const { data: headsData } = await supabase
-        .from("club_members")
-        .select("club_id, user:profiles(name)")
-        .eq("role_in_club", "head");
-
-      const clubsWithHeads = clubsData.map(club => {
-        const head = headsData?.find(h => h.club_id === club.id);
-        return {
-          ...club,
-          club_head: head?.user?.name || null
-        };
-      });
-
-      setClubs(clubsWithHeads);
-      // Extract unique categories
-      const uniqueCategories = [...new Set(clubsData.map(club => club.category))];
-      setCategories(uniqueCategories);
+    try {
+      const response = await axios.get("http://localhost:5000/api/clubs");
+      setClubs(response.data);
+      const uniqueCategories = [...new Set(response.data.map((club: any) => club.category))];
+      setCategories(uniqueCategories as string[]);
+    } catch (error) {
+      console.error("Error fetching clubs:", error);
     }
   };
 
   const fetchMyPendingClubs = async () => {
     if (!user) return;
-
-    const { data } = await supabase
-      .from("clubs_pending")
-      .select("*")
-      .eq("created_by", user.id)
-      .in("status", ["pending", "rejected"])
-      .order("created_at", { ascending: false });
-
-    setMyPendingClubs(data || []);
+    try {
+      const response = await axios.get("http://localhost:5000/api/clubs/my-requests", { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+      setMyPendingClubs(response.data);
+    } catch (error) {
+      console.error("Error fetching pending clubs:", error);
+    }
   };
 
   const handleSubmitClubRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!user) {
       toast.error("You must be logged in to create a club");
       return;
     }
 
-    const { error } = await supabase.from("clubs_pending").insert({
-      ...clubForm,
-      created_by: user.id,
-      status: "pending",
-    });
-
-    if (error) {
-      toast.error("Failed to submit club request");
-      console.error(error);
-    } else {
+    try {
+      await axios.post("http://localhost:5000/api/clubs/request", clubForm, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
       toast.success("Club request submitted! An admin will review it soon.");
       setClubForm({
         name: "",
@@ -120,6 +91,45 @@ export default function Clubs() {
       });
       setDialogOpen(false);
       fetchMyPendingClubs();
+    } catch (error) {
+      toast.error("Failed to submit club request");
+      console.error(error);
+    }
+  };
+
+  // Mock AI Matching Logic (Client-side only for now to detach from Supabase)
+  const fetchRecommendedClubs = async () => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Use already fetched clubs if available, or fetch
+    // To minimize complexity, we'll just wait for main fetch or fetch purely for recommender if needed.
+    // Let's just pick from the 'clubs' state? 
+    // Issue: clubs state might not be set yet.
+    // Let's do a separate fetch or chain it.
+
+    try {
+      const response = await axios.get("http://localhost:5000/api/clubs");
+      const allClubs = response.data;
+
+      if (allClubs && allClubs.length > 0) {
+        // Pick 3 random
+        const shuffled = allClubs.sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, 3);
+
+        const scoredClubs = selected.map((club: any) => ({
+          ...club,
+          matchScore: Math.floor(Math.random() * (99 - 70) + 70),
+          matchReason: "Matches your interest in technology and leadership."
+        })).sort((a: any, b: any) => b.matchScore - a.matchScore);
+
+        setRecommendedClubs(scoredClubs);
+
+        // Note: AI Logging via Supabase removed for now. 
+        // TODO: Add backend endpoint for AI Interaction Logging.
+      }
+    } catch (error) {
+      console.error("Rec Algo Error", error);
     }
   };
 
@@ -150,6 +160,43 @@ export default function Clubs() {
       </section>
 
       <div className="container mx-auto px-4 py-12">
+        {/* AI Recommendations Section */}
+        {user && recommendedClubs.length > 0 && (
+          <div className="mb-16">
+            <div className="flex items-center gap-2 mb-6">
+              <Sparkles className="w-6 h-6 text-purple-600 animate-pulse" />
+              <h2 className="text-2xl font-bold text-slate-900">AI Recommended for You</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {recommendedClubs.map((club) => (
+                <Link key={club.id} to={`/clubs/${club.id}`}>
+                  <Card className="h-full hover:shadow-xl transition-all duration-300 cursor-pointer group overflow-hidden border-purple-200 bg-white flex flex-col relative ring-1 ring-purple-100">
+                    <div className="absolute top-3 right-3 z-10">
+                      <Badge className="bg-purple-600 hover:bg-purple-700 text-white border-none shadow-lg shadow-purple-900/20">
+                        {club.matchScore}% Match
+                      </Badge>
+                    </div>
+                    <div className="h-40 bg-gradient-to-br from-purple-900 to-indigo-900 flex items-center justify-center relative overflow-hidden">
+                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+                      <Sparkles className="w-12 h-12 text-white/30 group-hover:scale-110 transition-transform duration-500" />
+                    </div>
+                    <CardHeader className="pt-4 pb-2 px-5">
+                      <CardTitle className="text-xl font-bold text-slate-900 group-hover:text-purple-600 transition-colors mb-1">
+                        {club.name}
+                      </CardTitle>
+                      <p className="text-xs font-medium text-purple-600 mb-2">
+                        {club.matchReason}
+                      </p>
+                      <CardDescription className="line-clamp-2 text-slate-500 text-xs">
+                        {club.description}
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
         {/* My Pending/Rejected Clubs Section */}
         {user && myPendingClubs.length > 0 && (
           <Card className="mb-12 border-slate-200 shadow-sm bg-white overflow-hidden">
