@@ -1,73 +1,82 @@
-# Welcome to your Lovable project
 
-## Project info
+# Club Connect
 
-**URL**: https://lovable.dev/projects/a67349ed-3516-41d7-8e63-75a52987e17e
+Club Connect is a comprehensive platform for university societies to manage events, announcements, and memberships.
 
-## How can I edit this code?
+## Architecture
 
-There are several ways of editing your application.
+This project has migrated from a Serverless (Supabase) architecture to a self-hosted custom backend.
 
-**Use Lovable**
+*   **Frontend:** React (Vite), Tailwind CSS, Shadcn UI
+*   **Backend:** Node.js, Express.js
+*   **Database (Relational):** MySQL (Users, Clubs, Events, Announcements)
+*   **Database (NoSQL):** MongoDB (AI Logs, Analytics)
+*   **Authentication:** Custom JWT-based Auth (merged with MySQL Profiles)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/a67349ed-3516-41d7-8e63-75a52987e17e) and start prompting.
+## Prerequisites
 
-Changes made via Lovable will be committed automatically to this repo.
+1.  **Node.js** (v18+)
+2.  **MySQL Server** (Running on localhost:3306)
+3.  **MongoDB Community Server** (Running on localhost:27017)
 
-**Use your preferred IDE**
+## Installation & Setup
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 1. Database Setup
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1.  Open your MySQL Workbench or CLI.
+2.  Run the script `MYSQL_SCHEMA.sql` located in the root directory to create the database and tables.
+3.  Ensure MongoDB is running locally.
 
-Follow these steps:
+### 2. Backend Setup
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+1.  Navigate to the backend folder:
+    ```bash
+    cd Backend
+    ```
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+3.  Create a `.env` file in the `Backend` directory with the following:
+    ```env
+    PORT=5000
+    MYSQL_PASSWORD=your_mysql_password
+    JWT_SECRET=your_jwt_secret
+    MONGO_URI=mongodb://127.0.0.1:27017/club_connect
+    ```
+4.  Start the server:
+    ```bash
+    npm run dev
+    ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 3. Frontend Setup
 
-# Step 3: Install the necessary dependencies.
-npm i
+1.  Navigate to the root directory (if not already there):
+    ```bash
+    cd ..
+    ```
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+3.  Start the frontend:
+    ```bash
+    npm run dev
+    ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+## Features
 
-**Edit a file directly in GitHub**
+*   **Authentication:** Student, Club Head, and Admin roles.
+*   **Club Management:** Application, Approval, and Custom Dashboards.
+*   **Events:** Creation, Registration, and Management.
+*   **Announcements:** Club-wide broadcasts.
+*   **AI Integration (Upcoming):** Club Matchmaker & Generative Posters.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## API Documentation
 
-**Use GitHub Codespaces**
+The backend runs on `http://localhost:5000/api`.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/a67349ed-3516-41d7-8e63-75a52987e17e) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+*   `POST /api/auth/register` - Create account
+*   `POST /api/auth/login` - Login & Get Token
+*   `GET /api/clubs` - List all clubs
+*   `GET /api/events` - List upcoming events
