@@ -75,7 +75,7 @@ export default function ClubDetail() {
       setAnnouncements(announcementsRes.data);
 
       // Derive club head from members list
-      const head = membersRes.data.find((m: any) => m.role_in_club === 'head');
+      const head = membersRes.data.find((m: any) => m.role === 'head');
       setClubHead(head ? head.name : "Unknown");
 
       // Check if current user is member
@@ -83,7 +83,7 @@ export default function ClubDetail() {
         const myMembership = membersRes.data.find((m: any) => m.id === user.id); // Note: user.id from context matches m.id (profile id)
         // Wait, m.id is profile id (user_id).
         setIsMember(!!myMembership);
-        setCurrentUserRole(myMembership ? myMembership.role_in_club : "");
+        setCurrentUserRole(myMembership ? myMembership.role : "");
       }
 
       // Discussions still need Supabase or a new endpoint? 
@@ -106,9 +106,10 @@ export default function ClubDetail() {
       });
       setDiscussions(discussionsRes.data);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching club data:", error);
-      toast.error("Failed to load club details");
+      console.error("Failed Request URL:", error.config?.url);
+      toast.error(`Failed to load club details: ${error.response?.status} ${error.response?.statusText || ''}`);
     } finally {
       setLoading(false);
     }

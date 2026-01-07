@@ -36,6 +36,7 @@ import {
 
 export default function ClubDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [clubs, setClubs] = useState<any[]>([]);
   const [selectedClub, setSelectedClub] = useState<any>(null);
   const [events, setEvents] = useState<any[]>([]);
@@ -57,6 +58,7 @@ export default function ClubDashboard() {
     description: "",
     date: "",
     venue: "",
+    banner_url: "", // AI Image or Link
   });
 
   const [announcementText, setAnnouncementText] = useState("");
@@ -163,7 +165,7 @@ export default function ClubDashboard() {
         ...eventForm,
         organizer_club: selectedClub.id
       });
-      toast.success("Event created successfully!"); // Direct creation now, not pending (unless we want pending events too?)
+      toast.success("Event submitted for approval!"); // Direct creation now, not pending (unless we want pending events too?)
       // My backend creates directly into 'events' table. Frontend said "submitted for admin approval" (pending).
       // I changed backend to insert directly into 'events' table in this step for simplicity and immediate feedback.
       // If "pending" behavior is strictly required, I need to use `events_pending` table backend side.
@@ -267,6 +269,7 @@ export default function ClubDashboard() {
       description: event.description || "",
       date: new Date(event.date).toISOString().slice(0, 16),
       venue: event.venue,
+      banner_url: event.banner_url || ""
     });
     setEventDialogOpen(true);
   };
@@ -473,94 +476,15 @@ export default function ClubDashboard() {
                       <CardTitle className="text-xl font-bold text-slate-900">Events Management</CardTitle>
                       <CardDescription>Create and manage your club events</CardDescription>
                     </div>
-                    <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button onClick={openNewEventDialog} className="gap-2 bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/10">
-                          <Plus className="w-4 h-4" />
-                          New Event
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[500px]">
-                        <DialogHeader>
-                          <DialogTitle>
-                            {editingEvent ? "Edit Event" : "Create New Event"}
-                          </DialogTitle>
-                          <DialogDescription>
-                            {editingEvent
-                              ? "Update your event details"
-                              : "Add a new event for your club"}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <form
-                          onSubmit={editingEvent ? handleUpdateEvent : handleCreateEvent}
-                          className="space-y-4 mt-4"
-                        >
-                          <div className="space-y-2">
-                            <Label htmlFor="event-title">Title</Label>
-                            <Input
-                              id="event-title"
-                              value={eventForm.title}
-                              onChange={(e) =>
-                                setEventForm({ ...eventForm, title: e.target.value })
-                              }
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="event-description">Description</Label>
-                            <Textarea
-                              id="event-description"
-                              value={eventForm.description}
-                              onChange={(e) =>
-                                setEventForm({ ...eventForm, description: e.target.value })
-                              }
-                              rows={3}
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="event-date">Date & Time</Label>
-                              <Input
-                                id="event-date"
-                                type="datetime-local"
-                                value={eventForm.date}
-                                onChange={(e) =>
-                                  setEventForm({ ...eventForm, date: e.target.value })
-                                }
-                                required
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="event-venue">Venue</Label>
-                              <Input
-                                id="event-venue"
-                                value={eventForm.venue}
-                                onChange={(e) =>
-                                  setEventForm({ ...eventForm, venue: e.target.value })
-                                }
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="flex gap-2 pt-4">
-                            <Button type="submit" className="flex-1 bg-slate-900 hover:bg-slate-800">
-                              {editingEvent ? "Update Event" : "Create Event"}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => {
-                                setEventDialogOpen(false);
-                                setEditingEvent(null);
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate(`/create-event/${selectedClub?.id}`)}
+                      className="border-slate-800 text-slate-900 font-medium hover:bg-slate-100 flex items-center gap-2"
+                    >
+                      <span className="text-lg">+</span> New Event
+                    </Button>
                   </CardHeader>
+
                   <CardContent>
                     {events.length > 0 ? (
                       <div className="space-y-4">
@@ -817,6 +741,6 @@ export default function ClubDashboard() {
         </DialogContent>
       </Dialog>
 
-    </div>
+    </div >
   );
 }

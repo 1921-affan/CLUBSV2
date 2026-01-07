@@ -10,10 +10,21 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Users } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
 export default function Events() {
   const { user } = useAuth();
   const [events, setEvents] = useState<any[]>([]);
   const [registrations, setRegistrations] = useState<Set<string>>(new Set());
+  const [selectedEvent, setSelectedEvent] = useState<any>(null); // For detail view
 
   useEffect(() => {
     fetchEvents();
@@ -167,24 +178,12 @@ export default function Events() {
                   </div>
 
                   <div className="pt-2 mt-1">
-                    {isRegistered(event.id) ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-9 text-xs"
-                        onClick={() => handleUnregister(event.id)}
-                      >
-                        Cancel Registration
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="w-full bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20 h-9 text-xs"
-                        onClick={() => handleRegister(event.id)}
-                      >
-                        Register Now
-                      </Button>
-                    )}
+                    <Button
+                      onClick={() => setSelectedEvent(event)}
+                      className="w-full bg-slate-900 text-white hover:bg-slate-800 h-9 text-xs"
+                    >
+                      View Details
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -203,6 +202,62 @@ export default function Events() {
         )}
       </div>
 
+      <Dialog open={!!selectedEvent} onOpenChange={(open) => !open && setSelectedEvent(null)}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-slate-900">{selectedEvent?.title}</DialogTitle>
+            <DialogDescription>
+              Organized by {selectedEvent?.organizer_club?.name || "Club"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-slate-600">
+                <Calendar className="w-4 h-4" />
+                <span className="font-medium">
+                  {selectedEvent && new Date(selectedEvent.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {selectedEvent && new Date(selectedEvent.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-600">
+                <MapPin className="w-4 h-4" />
+                <span>{selectedEvent?.venue}</span>
+              </div>
+            </div>
+
+            <div className="text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-lg border border-slate-100 max-h-[300px] overflow-y-auto">
+              {selectedEvent?.description || "No description provided."}
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setSelectedEvent(null)}>Close</Button>
+            {selectedEvent && (
+              isRegistered(selectedEvent.id) ? (
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    handleUnregister(selectedEvent.id);
+                    setSelectedEvent(null);
+                  }}
+                >
+                  Unregister
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => {
+                    handleRegister(selectedEvent.id);
+                    setSelectedEvent(null);
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  Register Now
+                </Button>
+              )
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

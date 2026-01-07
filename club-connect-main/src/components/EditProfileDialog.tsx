@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
+import axios from "axios";
 import { toast } from "sonner";
 import { Loader2, Pencil } from "lucide-react";
 
@@ -40,23 +40,16 @@ export function EditProfileDialog({ profile, onProfileUpdate }: EditProfileDialo
         setLoading(true);
 
         try {
-            const { error } = await supabase
-                .from("profiles")
-                .update({
-                    name: formData.name,
-                    bio: formData.bio,
-                    avatar_url: formData.avatar_url,
-                })
-                .eq("id", profile.id);
-
-            if (error) throw error;
+            await axios.put("http://localhost:5000/api/users/me", formData, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            });
 
             toast.success("Profile updated successfully");
             onProfileUpdate();
             setOpen(false);
         } catch (error: any) {
             console.error("Error updating profile:", error);
-            toast.error(`Failed to update profile: ${error.message || error.error_description || "Unknown error"}`);
+            toast.error(`Failed to update profile: ${error.message || "Server Error"}`);
         } finally {
             setLoading(false);
         }

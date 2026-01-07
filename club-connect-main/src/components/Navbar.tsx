@@ -17,6 +17,7 @@ export function Navbar() {
   const navLinks = [
     { to: "/", label: "Home" },
     { to: "/clubs", label: "Clubs" },
+    { to: "/matchmaker", label: "AI Match" },
     { to: "/events", label: "Events" },
     { to: "/announcements", label: "Announcements" },
   ];

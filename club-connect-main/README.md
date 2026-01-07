@@ -80,3 +80,20 @@ The backend runs on `http://localhost:5000/api`.
 *   `POST /api/auth/login` - Login & Get Token
 *   `GET /api/clubs` - List all clubs
 *   `GET /api/events` - List upcoming events
+
+
+AI Creative Director Deployed 🧑‍🎨
+
+I have successfully updated the system!
+
+Feature 1: Smart Copywriting 📝 Before: You typed "Hackathon" -> Poster said "Hackathon". Now: You typed "Hackathon" -> Gemini writes "CODE THE FUTURE" and a catchy slogan for you.
+
+Feature 2: Dynamic Styling 🎨 Your poster now intelligently picks an Accent Color based on the event vibe (e.g., Cyber Blue for tech, Red for sports) and applies it to the layout elements automatically.
+
+Try it out:
+
+Enter your raw details.
+Click "Generate AI Poster".
+Watch as the AI re-writes your text and designs the image simultaneously!
+Go ahead and create your next masterpiece! ✨
+

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
+  User,
   Users,
   Calendar,
   TrendingUp,
@@ -147,7 +148,8 @@ export default function AdminPanel() {
       fetchAllData();
     } catch (error: any) {
       console.error("Error approving club:", error);
-      toast.error("Failed to approve club");
+      const errorMessage = error.response?.data?.sqlError || error.response?.data?.error || "Failed to approve club";
+      toast.error(errorMessage);
     } finally {
       setApprovingClubs(prev => {
         const newSet = new Set(prev);
@@ -169,9 +171,14 @@ export default function AdminPanel() {
   };
 
   const rejectAnnouncement = async (announcementId: string) => {
-    // Rejection logic not yet implemented on backend
-    console.log("Reject announcement logic pending backend");
-    toast.info("Rejection not fully implemented on backend yet.");
+    try {
+      await axios.post(`http://localhost:5000/api/admin/announcements/${announcementId}/reject`, {}, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+      toast.success("Announcement rejected");
+      fetchAllData();
+    } catch (error: any) {
+      console.error("Error rejecting announcement:", error);
+      toast.error("Failed to reject announcement");
+    }
   };
 
   const approveEvent = async (event: any) => {
@@ -186,9 +193,14 @@ export default function AdminPanel() {
   };
 
   const rejectEvent = async (eventId: string) => {
-    // Rejection logic not yet implemented on backend
-    console.log("Reject event logic pending backend");
-    toast.info("Rejection not fully implemented on backend yet.");
+    try {
+      await axios.post(`http://localhost:5000/api/admin/events/${eventId}/reject`, {}, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+      toast.success("Event rejected");
+      fetchAllData();
+    } catch (error: any) {
+      console.error("Error rejecting event:", error);
+      toast.error("Failed to reject event");
+    }
   };
 
   const rejectClub = async (clubId: string, clubName: string, createdBy: string) => {
@@ -366,18 +378,16 @@ export default function AdminPanel() {
                             <p className="text-slate-600 mb-4 leading-relaxed">
                               {club.description}
                             </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-slate-500">
-                              {club.faculty_advisor && (
-                                <div className="flex items-center gap-2">
-                                  <Users className="w-4 h-4" />
-                                  <span>Advisor: {club.faculty_advisor}</span>
-                                </div>
-                              )}
-                              <div className="flex items-center gap-2">
-                                <Users className="w-4 h-4" />
-                                <span>By: {club.creator?.name} ({club.creator?.email})</span>
+                            <div className="flex items-center gap-4 mt-4 text-sm text-slate-500">
+                              <div className="flex items-center gap-1.5">
+                                <User className="w-4 h-4" />
+                                <span>Advisor: {club.faculty_advisor || "None"}</span>
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <Users className="w-4 h-4" />
+                                <span>By: {club.creator?.name || "Unknown"}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
                                 <Clock className="w-4 h-4" />
                                 <span>{new Date(club.created_at).toLocaleDateString()}</span>
                               </div>

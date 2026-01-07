@@ -22,3 +22,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment Variables
+.env
+Backend/.env
+
+# Test Scripts & Temp Files
+Backend/test_*.js
+Backend/diagnose_ai.js
+Backend/db_upgrade.js
+Backend/update_schema.js
+
+# Database Dumps
+Backend/*.sql
+
+# Media
+*.mp4

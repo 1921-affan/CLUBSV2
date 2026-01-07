@@ -97,40 +97,9 @@ export default function Clubs() {
     }
   };
 
-  // Mock AI Matching Logic (Client-side only for now to detach from Supabase)
+  // AI Recommendations removed in favor of dedicated Matchmaker page
   const fetchRecommendedClubs = async () => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Use already fetched clubs if available, or fetch
-    // To minimize complexity, we'll just wait for main fetch or fetch purely for recommender if needed.
-    // Let's just pick from the 'clubs' state? 
-    // Issue: clubs state might not be set yet.
-    // Let's do a separate fetch or chain it.
-
-    try {
-      const response = await axios.get("http://localhost:5000/api/clubs");
-      const allClubs = response.data;
-
-      if (allClubs && allClubs.length > 0) {
-        // Pick 3 random
-        const shuffled = allClubs.sort(() => 0.5 - Math.random());
-        const selected = shuffled.slice(0, 3);
-
-        const scoredClubs = selected.map((club: any) => ({
-          ...club,
-          matchScore: Math.floor(Math.random() * (99 - 70) + 70),
-          matchReason: "Matches your interest in technology and leadership."
-        })).sort((a: any, b: any) => b.matchScore - a.matchScore);
-
-        setRecommendedClubs(scoredClubs);
-
-        // Note: AI Logging via Supabase removed for now. 
-        // TODO: Add backend endpoint for AI Interaction Logging.
-      }
-    } catch (error) {
-      console.error("Rec Algo Error", error);
-    }
+    // No-op
   };
 
   const filteredClubs = clubs.filter((club) => {
@@ -160,43 +129,7 @@ export default function Clubs() {
       </section>
 
       <div className="container mx-auto px-4 py-12">
-        {/* AI Recommendations Section */}
-        {user && recommendedClubs.length > 0 && (
-          <div className="mb-16">
-            <div className="flex items-center gap-2 mb-6">
-              <Sparkles className="w-6 h-6 text-purple-600 animate-pulse" />
-              <h2 className="text-2xl font-bold text-slate-900">AI Recommended for You</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {recommendedClubs.map((club) => (
-                <Link key={club.id} to={`/clubs/${club.id}`}>
-                  <Card className="h-full hover:shadow-xl transition-all duration-300 cursor-pointer group overflow-hidden border-purple-200 bg-white flex flex-col relative ring-1 ring-purple-100">
-                    <div className="absolute top-3 right-3 z-10">
-                      <Badge className="bg-purple-600 hover:bg-purple-700 text-white border-none shadow-lg shadow-purple-900/20">
-                        {club.matchScore}% Match
-                      </Badge>
-                    </div>
-                    <div className="h-40 bg-gradient-to-br from-purple-900 to-indigo-900 flex items-center justify-center relative overflow-hidden">
-                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
-                      <Sparkles className="w-12 h-12 text-white/30 group-hover:scale-110 transition-transform duration-500" />
-                    </div>
-                    <CardHeader className="pt-4 pb-2 px-5">
-                      <CardTitle className="text-xl font-bold text-slate-900 group-hover:text-purple-600 transition-colors mb-1">
-                        {club.name}
-                      </CardTitle>
-                      <p className="text-xs font-medium text-purple-600 mb-2">
-                        {club.matchReason}
-                      </p>
-                      <CardDescription className="line-clamp-2 text-slate-500 text-xs">
-                        {club.description}
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* AI Recommendations Section Removed (Moved to /matchmaker) */}
         {/* My Pending/Rejected Clubs Section */}
         {user && myPendingClubs.length > 0 && (
           <Card className="mb-12 border-slate-200 shadow-sm bg-white overflow-hidden">

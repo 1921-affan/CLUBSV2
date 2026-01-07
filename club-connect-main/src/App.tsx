@@ -11,6 +11,7 @@ import { MainLayout } from "@/components/MainLayout";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
 import Clubs from "./pages/Clubs";
+import ClubMatchmaker from "./pages/ClubMatchmaker";
 import ClubDetail from "./pages/ClubDetail";
 import Events from "./pages/Events";
 import Announcements from "./pages/Announcements";
@@ -18,6 +19,7 @@ import ClubDashboard from "./pages/ClubDashboard";
 import AdminPanel from "./pages/AdminPanel";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import CreateEvent from "./pages/CreateEvent";
 
 const queryClient = new QueryClient();
 
@@ -41,10 +43,13 @@ const App = () => (
             >
               <Route path="/" element={<Home />} />
               <Route path="/clubs" element={<Clubs />} />
+              <Route path="/matchmaker" element={<ClubMatchmaker />} />
               <Route path="/clubs/:id" element={<ClubDetail />} />
               <Route path="/events" element={<Events />} />
               <Route path="/announcements" element={<Announcements />} />
+              <Route path="/announcements" element={<Announcements />} />
               <Route path="/dashboard" element={<ClubDashboard />} />
+              <Route path="/create-event/:clubId" element={<CreateEvent />} />
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/profile" element={<Profile />} />
             </Route>
