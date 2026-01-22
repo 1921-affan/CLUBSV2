@@ -1,10 +1,10 @@
-
 import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import axios from "axios";
 import { toPng } from 'html-to-image';
@@ -216,7 +216,12 @@ export default function CreateEvent() {
 
                         {/* Submit Button */}
                         <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
-                            <p className="text-xs text-slate-500">Status: <span className="font-semibold text-orange-500">Pending Approval</span></p>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-slate-500 font-medium">Club Status:</span>
+                                <Badge variant="default" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200">
+                                    Approved
+                                </Badge>
+                            </div>
                             <Button type="submit" size="lg" disabled={isSubmitting} className="bg-slate-900 hover:bg-slate-800 px-8">
                                 {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : "Submit Event"}
                             </Button>

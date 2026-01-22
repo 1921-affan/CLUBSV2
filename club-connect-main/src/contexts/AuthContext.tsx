@@ -14,7 +14,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, name: string, role?: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, name: string, branch: string, year: string, role?: string) => Promise<{ error: any }>;
   signOut: () => void;
 }
 
@@ -77,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, name: string, role: string = 'student') => {
+  const signUp = async (email: string, password: string, name: string, branch: string, year: string, role: string = 'student') => {
     try {
       // Default to 'student' if not specified. 
       // Note: Admin/Club Head creation rules are enforced by backend policies (Single Admin, etc.)
@@ -85,7 +85,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         name,
-        role
+        role,
+        branch,
+        year_of_study: year
       });
 
       // Auto-login after register? Or ask to login?

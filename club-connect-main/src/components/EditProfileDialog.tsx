@@ -28,6 +28,8 @@ export function EditProfileDialog({ profile, onProfileUpdate }: EditProfileDialo
         name: profile?.name || "",
         bio: profile?.bio || "",
         avatar_url: profile?.avatar_url || "",
+        branch: profile?.branch || "",
+        year_of_study: profile?.year_of_study || "",
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -108,6 +110,29 @@ export function EditProfileDialog({ profile, onProfileUpdate }: EditProfileDialo
                             </p>
                         </div>
                     </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="branch">Branch</Label>
+                            <Input
+                                id="branch"
+                                name="branch"
+                                value={formData.branch}
+                                onChange={handleChange}
+                                placeholder="Branch"
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="year_of_study">Year</Label>
+                            <Input
+                                id="year_of_study"
+                                name="year_of_study"
+                                value={formData.year_of_study}
+                                onChange={handleChange}
+                                placeholder="Year"
+                            />
+                        </div>
+                    </div>
+
                     <DialogFooter>
                         <Button type="submit" disabled={loading} className="bg-slate-900 text-white hover:bg-slate-800">
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -116,6 +141,6 @@ export function EditProfileDialog({ profile, onProfileUpdate }: EditProfileDialo
                     </DialogFooter>
                 </form>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }

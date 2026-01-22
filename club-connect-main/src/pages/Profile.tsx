@@ -99,6 +99,18 @@ export default function Profile() {
                                     <Mail className="w-4 h-4" />
                                     <span className="text-sm font-medium">{profile?.email}</span>
                                 </div>
+                                {profile?.branch && (
+                                    <div className="flex items-center justify-center md:justify-start gap-3 text-slate-300 bg-white/5 px-4 py-1.5 rounded-full w-fit mx-auto md:mx-0 border border-white/10">
+                                        <Award className="w-4 h-4" />
+                                        <span className="text-sm font-medium">{profile.branch}</span>
+                                    </div>
+                                )}
+                                {profile?.year_of_study && (
+                                    <div className="flex items-center justify-center md:justify-start gap-3 text-slate-300 bg-white/5 px-4 py-1.5 rounded-full w-fit mx-auto md:mx-0 border border-white/10">
+                                        <Calendar className="w-4 h-4" />
+                                        <span className="text-sm font-medium">Year: {profile.year_of_study}</span>
+                                    </div>
+                                )}
                                 {profile && (
                                     <EditProfileDialog profile={profile} onProfileUpdate={fetchProfileData} />
                                 )}

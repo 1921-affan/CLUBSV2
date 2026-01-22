@@ -13,6 +13,8 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [branch, setBranch] = useState("");
+  const [year, setYear] = useState("");
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
@@ -42,7 +44,7 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await signUp(email, password, name);
+    const { error } = await signUp(email, password, name, branch, year);
 
     if (error) {
       toast.error(error.message || "Failed to sign up");

@@ -67,7 +67,7 @@ app.get('/api/clubs', async (req, res) => {
 // Register User
 // Rule Implemented: "handle_new_user" (Auto Role) & "check_single_admin" (One Admin Policy)
 app.post('/api/auth/register', async (req, res) => {
-    const { id, name, email, password, role } = req.body;
+    const { id, name, email, password, role, branch, year_of_study } = req.body;
     // Note: 'id' usually comes from auth provider, but we are generating it or letting UUID() handle it.
     // For this custom auth, we will generate UUID in SQL if not provided, or expect it.
     // Let's assume we receive plain data and let MySQL generate UUID.
@@ -95,10 +95,10 @@ app.post('/api/auth/register', async (req, res) => {
         const newUserId = crypto.randomUUID();
 
         await sequelize.query(
-            `INSERT INTO profiles (id, name, email, password_hash, role) 
-       VALUES (:id, :name, :email, :password, :role)`,
+            `INSERT INTO profiles (id, name, email, password_hash, role, branch, year_of_study) 
+       VALUES (:id, :name, :email, :password, :role, :branch, :year_of_study)`,
             {
-                replacements: { id: newUserId, name, email, password: hashedPassword, role: role || 'student' },
+                replacements: { id: newUserId, name, email, password: hashedPassword, role: role || 'student', branch: branch || null, year_of_study: year_of_study || null },
                 type: QueryTypes.INSERT
             }
         );
@@ -218,11 +218,11 @@ app.get('/api/users/me/events', verifyToken, async (req, res) => {
 
 // Update Profile
 app.put('/api/users/me', verifyToken, async (req, res) => {
-    const { name, bio, avatar_url } = req.body;
+    const { name, bio, avatar_url, branch, year_of_study } = req.body;
     try {
         await sequelize.query(
-            "UPDATE profiles SET name = :name, bio = :bio, avatar_url = :avatar_url WHERE id = :id",
-            { replacements: { name, bio, avatar_url, id: req.user.id }, type: QueryTypes.UPDATE }
+            "UPDATE profiles SET name = :name, bio = :bio, avatar_url = :avatar_url, branch = :branch, year_of_study = :year_of_study WHERE id = :id",
+            { replacements: { name, bio, avatar_url, branch, year_of_study, id: req.user.id }, type: QueryTypes.UPDATE }
         );
         // Also update User record if needed, but we use profiles mainly.
         // Update Session User Name if possible? 

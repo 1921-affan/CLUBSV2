@@ -154,10 +154,16 @@ export default function Clubs() {
                       </p>
                     </div>
                     <Badge
-                      variant={club.status === "rejected" ? "destructive" : "secondary"}
-                      className={club.status === "rejected" ? "" : "bg-amber-100 text-amber-700 hover:bg-amber-200"}
+                      variant={club.status === "rejected" ? "destructive" : club.status === "approved" ? "default" : "secondary"}
+                      className={
+                        club.status === "rejected"
+                          ? "bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
+                          : club.status === "approved"
+                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200"
+                            : "bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200"
+                      }
                     >
-                      {club.status === "rejected" ? "Rejected" : "Pending Review"}
+                      {club.status.charAt(0).toUpperCase() + club.status.slice(1)}
                     </Badge>
                   </div>
                 ))}
